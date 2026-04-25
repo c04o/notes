@@ -34,8 +34,8 @@
 
         shellHook = ''
           echo "Typst shell successfully loaded!"
-          echo "Run 'typst watch index.typ' to compile in real time"
-          echo "Run 'typstyle format index.typ' to format source code"
+          echo "Run 'typst watch main.typ' to compile in real time"
+          echo "Run 'typstyle format main.typ' to format source code"
         '';
       };
     });
