@@ -1,38 +1,44 @@
 name: ci
 
-# when to run the ci
+# when to run
 on:
   push:
     branches:
       - main
+      - ci
   pull_request:
     branches:
       - main
 
 jobs:
+  # verify code quality before building
   lint:
     name: lint
     runs-on: ubuntu-latest
     steps:
-      # clone repo in runner
+      # pull the source code from the repository
       - uses: actions/checkout@v5
 
-      # efficient nix installer & caching
+      # install nix using determinate systems' installer
       - uses: DeterminateSystems/nix-installer-action@main
+      
+      # setup magic nix cache to speed up subsequent runs
       - uses: DeterminateSystems/magic-nix-cache-action@main
 
-      # check that nix files are formatted
+      # run alejandra to ensure nix files follow formatting standards
       - name: check nix formatting
         run: nix run nixpkgs#alejandra -- --check .
 
-      # ensure all inputs/outputs are right
+      # validate flake inputs, outputs, and nix syntax
       - name: check flake
         run: nix flake check
 
+  # compile the doc & prepare web artifact
   build:
     name: build
     runs-on: ubuntu-latest
-    # wait for lint job to pass
+
+    # only start if lint passes
     needs: lint
     outputs:
       artifact-id: ${{ steps.upload-artifact.outputs.artifact-id }}
@@ -41,30 +47,41 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
 
+      # uses 'nix develop' to access the typst package from flake
+      # compile into a pdf
       - name: compile typst pdf
         run: nix develop --command typst compile main.typ
 
+      # create a simple wrapper to make the pdf viewable in a browser
       - name: create index.html
         run: |
           echo '<!DOCTYPE html><html><body style="margin:0"><embed src="main.pdf" type="application/pdf" width="100%" height="100vh" style="height:100vh;"></body></html>' > index.html
 
-      - name: Upload for deployment
+      # package the compiled pdf & index.html for the deployment
+      - name: upload for deployment
         uses: actions/upload-pages-artifact@v3
         with:
-          # upload main.pdf & index.html
           path: .
 
+  # push the content to web
   deploy:
     name: deploy
+
+    # wait for build to finish
     needs: build
     runs-on: ubuntu-latest
+
+    # permissions required for gh pages deployment
     permissions:
       pages: write
       id-token: write
+
+    # create a deployment env for history
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # take the artifact from build & make it public
       - name: deploy to github pages
         id: deployment
         uses: actions/deploy-pages@v4
