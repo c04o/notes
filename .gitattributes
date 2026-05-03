@@ -1,0 +1,2 @@
+# force gh to include typst in lang bar
+*.typ linguist-detectable=true
