@@ -34,19 +34,37 @@ jobs:
     runs-on: ubuntu-latest
     # wait for lint job to pass
     needs: lint
+    outputs:
+      artifact-id: ${{ steps.upload-artifact.outputs.artifact-id }}
     steps:
-      - uses: actions/checkout@v4
-
+      - uses: actions/checkout@v5
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
 
-      # naturally runs if the lint job passed
-      - name: compile pdf
+      - name: compile typst pdf
         run: nix develop --command typst compile main.typ
 
-      # Make the PDF downloadable from the GitHub Actions run
-      - name: Upload PDF Artifact
-        uses: actions/upload-artifact@v4
+      - name: create index.html
+        run: |
+          echo '<!DOCTYPE html><html><body style="margin:0"><embed src="main.pdf" type="application/pdf" width="100%" height="100vh" style="height:100vh;"></body></html>' > index.html
+
+      - name: Upload for deployment
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: notes-pdf
-          path: main.pdf
+          # upload main.pdf & index.html
+          path: .
+
+  deploy:
+    name: deploy
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: deploy to github pages
+        id: deployment
+        uses: actions/deploy-pages@v4
