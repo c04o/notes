@@ -1,0 +1,52 @@
+name: ci
+
+# when to run the ci
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      # clone repo in runner
+      - uses: actions/checkout@v5
+
+      # efficient nix installer & caching
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
+      # check that nix files are formatted
+      - name: check nix formatting
+        run: nix run nixpkgs#alejandra -- --check .
+
+      # ensure all inputs/outputs are right
+      - name: check flake
+        run: nix flake check
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    # wait for lint job to pass
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
+      # naturally runs if the lint job passed
+      - name: compile pdf
+        run: nix develop --command typst compile main.typ
+
+      # Make the PDF downloadable from the GitHub Actions run
+      - name: Upload PDF Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: notes-pdf
+          path: main.pdf
